@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: Spring Notifications API
+  version: 1.0.0
+  description: Local portfolio demo. SENT means simulated database delivery, not a real email.
+servers:
+  - url: http://localhost:8088
+paths:
+  /api/notifications:
+    post:
+      summary: Accept a notification for asynchronous processing
+      description: Same key and payload returns the same resource with its current status. Changed payload returns 409.
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9._:-]{1,100}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+            example:
+              recipient: demo@example.com
+              subject: Order ready
+              body: Your order is ready.
+      responses:
+        '202':
+          description: Persisted resource, possibly already SENT for a replay
+          headers:
+            Location:
+              schema: {type: string}
+              description: Relative URI of the notification
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '400':
+          description: Invalid or missing input
+        '409':
+          description: Key already used with a different payload
+  /api/notifications/{id}:
+    get:
+      summary: Read notification status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Current notification
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '400':
+          description: Malformed UUID
+        '404':
+          description: Notification does not exist
+components:
+  schemas:
+    NotificationRequest:
+      type: object
+      required: [recipient, subject, body]
+      properties:
+        recipient: {type: string, format: email, maxLength: 254, minLength: 1}
+        subject: {type: string, minLength: 1, maxLength: 200}
+        body: {type: string, minLength: 1, maxLength: 4000}
+    Notification:
+      allOf:
+        - $ref: '#/components/schemas/NotificationRequest'
+        - type: object
+          required: [id, status, createdAt, deliveryCount]
+          properties:
+            id: {type: string, format: uuid}
+            status: {type: string, enum: [PENDING, SENT]}
+            createdAt: {type: string, format: date-time}
+            sentAt: {type: string, format: date-time, nullable: true}
+            deliveryCount: {type: integer, minimum: 0, maximum: 1}

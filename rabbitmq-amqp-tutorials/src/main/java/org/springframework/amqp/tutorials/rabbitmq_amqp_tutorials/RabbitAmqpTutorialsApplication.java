@@ -20,7 +20,7 @@ public class RabbitAmqpTutorialsApplication {
 		};
 	}
 
-	@Profile("!usage_message")
+	@Profile("tutorial & !usage_message")
 	@Bean
 	public CommandLineRunner tutorial() {
 		return new RabbitAmqpTutorialsRunner();

@@ -1,11 +1,35 @@
 spring:
-  profiles:
-    active: usage_message
-
-logging:
-  level:
-    org: ERROR
-
-tutorial:
-  client:
-    duration: 10000
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:55432/notifications}
+    username: ${DATABASE_USER:notifications}
+    password: ${DATABASE_PASSWORD:local-demo-password}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:55672}
+    username: ${RABBITMQ_USER:notifications}
+    password: ${RABBITMQ_PASSWORD:local-demo-password}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 500ms
+server:
+  port: ${PORT:8088}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,rabbit
