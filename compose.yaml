@@ -1,0 +1,54 @@
+name: spring-notifications
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: notifications
+      POSTGRES_PASSWORD: local-demo-password
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notifications -d notifications"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: notifications
+      RABBITMQ_DEFAULT_PASS: local-demo-password
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '+S 2:2'
+    ports: ["127.0.0.1:55672:5672", "127.0.0.1:55673:15672"]
+    volumes: ["rabbit-data:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  app:
+    build: .
+    environment: &app-env
+      JAVA_TOOL_OPTIONS: '-XX:ActiveProcessorCount=2 -Xmx512m'
+      DATABASE_URL: jdbc:postgresql://postgres:5432/notifications
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    ports: ["127.0.0.1:8088:8088"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    restart: unless-stopped
+  tests:
+    image: maven:3.9.9-eclipse-temurin-21
+    profiles: ["test"]
+    working_dir: /workspace/rabbitmq-amqp-tutorials
+    volumes: [".:/workspace", "maven-cache:/root/.m2"]
+    environment: *app-env
+    command: ["mvn", "-B", "-ntp", "verify"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+volumes:
+  postgres-data:
+  rabbit-data:
+  maven-cache:
